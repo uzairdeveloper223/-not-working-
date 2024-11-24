@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini AI Chat</title>
+    <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@3.9.4/dist/full.css" rel="stylesheet" type="text/css" />
+    <script type="importmap">
+    {
+        "imports": {
+        "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyBUVMZkoTBB_BTP93wDu7b9kex6KCMJZcg",
+            authDomain: "gemini-chat-59801.firebaseapp.com",
+            databaseURL: "https://gemini-chat-59801-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "gemini-chat-59801",
+            storageBucket: "gemini-chat-59801.firebasestorage.app",
+            messagingSenderId: "805323632059",
+            appId: "1:805323632059:web:b63c7747af43d43c34e89e"
+        };
+        firebase.initializeApp(firebaseConfig);
+
+        // Initialize Gemini AI
+        const API_KEY = "AIzaSyBUVMZkoTBB_BTP93wDu7b9kex6KCMJZcg";
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [messages, setMessages] = useState([]);
+            const [newMessage, setNewMessage] = useState('');
+            const [isTyping, setIsTyping] = useState(false);
+            const messagesEndRef = useRef(null);
+
+            useEffect(() => {
+                const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+                    setUser(user);
+                    if (user) {
+                        loadMessages(user.uid);
+                    }
+                });
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            }, [messages]);
+
+            const loadMessages = (userId) => {
+                const messagesRef = firebase.database().ref('messages/' + userId);
+                messagesRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        const messageList = Object.entries(data).map(([key, value]) => ({
+                            id: key,
+                            ...value
+                        }));
+                        setMessages(messageList);
+                    }
+                });
+            };
+
+            const signInWithGoogle = () => {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                firebase.auth().signInWithPopup(provider).catch(console.error);
+            };
+
+            const signInAnonymously = () => {
+                firebase.auth().signInAnonymously().catch(console.error);
+            };
+
+            const signOut = () => {
+                firebase.auth().signOut().then(() => {
+                    setMessages([]);
+                }).catch(console.error);
+            };
+
+            const sendMessage = async (e) => {
+                e.preventDefault();
+                if (!newMessage.trim() || !user) return;
+
+                const messageData = {
+                    content: newMessage,
+                    sender: 'user',
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                };
+
+                const newMessageRef = firebase.database().ref('messages/' + user.uid).push();
+                await newMessageRef.set(messageData);
+
+                setNewMessage('');
+                setIsTyping(true);
+
+                try {
+                    const { GoogleGenerativeAI } = await import("@google/generative-ai");
+                    const genAI = new GoogleGenerativeAI(API_KEY);
+                    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+                    const result = await model.generateContent(newMessage);
+                    const response = await result.response;
+                    const aiMessageData = {
+                        content: response.text(),
+                        sender: 'ai',
+                        timestamp: firebase.database.ServerValue.TIMESTAMP
+                    };
+                    await firebase.database().ref('messages/' + user.uid).push().set(aiMessageData);
+                } catch (error) {
+                    console.error('Error generating AI response:', error);
+                    // Add a user-friendly error message
+                    const errorMessageData = {
+                        content: "Sorry, I couldn't generate a response. Please try again.",
+                        sender: 'ai',
+                        timestamp: firebase.database.ServerValue.TIMESTAMP
+                    };
+                    await firebase.database().ref('messages/' + user.uid).push().set(errorMessageData);
+                } finally {
+                    setIsTyping(false);
+                }
+            };
+
+            return (
+                <div className="container mx-auto px-4 py-8">
+                    <header className="mb-8">
+                        <h1 className="text-4xl font-bold text-center mb-4">Gemini AI Chat</h1>
+                        {!user ? (
+                            <div className="flex justify-center space-x-4">
+                                <button onClick={signInWithGoogle} className="btn btn-primary">Sign in with Google</button>
+                                <button onClick={signInAnonymously} className="btn btn-secondary">Continue as Guest</button>
+                            </div>
+                        ) : (
+                            <div className="flex justify-center items-center space-x-4">
+                                <span className="font-semibold">{user.displayName || 'Guest User'}</span>
+                                <button onClick={signOut} className="btn btn-outline btn-sm">Sign Out</button>
+                            </div>
+                        )}
+                    </header>
+
+                    {user && (
+                        <main className="bg-white rounded-lg shadow-lg p-6 mb-8">
+                            <div className="h-[60vh] overflow-y-auto mb-4 space-y-4">
+                                {messages.map((message) => (
+                                    <div key={message.id} className={`chat ${message.sender === 'user' ? 'chat-end' : 'chat-start'}`}>
+                                        <div className="chat-image avatar">
+                                            <div className="w-10 rounded-full">
+                                                <img src={message.sender === 'user' ? (user.photoURL || 'https://api.dicebear.com/6.x/initials/svg?seed=Guest') : 'https://api.dicebear.com/6.x/bottts/svg?seed=Gemini'} alt={message.sender} />
+                                            </div>
+                                        </div>
+                                        <div className="chat-header">
+                                            {message.sender === 'user' ? (user.displayName || 'You') : 'Gemini AI'}
+                                        </div>
+                                        <div className="chat-bubble">{message.content}</div>
+                                        <div className="chat-footer opacity-50">
+                                            {new Date(message.timestamp).toLocaleTimeString()}
+                                        </div>
+                                    </div>
+                                ))}
+                                {isTyping && (
+                                    <div className="chat chat-start">
+                                        <div className="chat-image avatar">
+                                            <div className="w-10 rounded-full">
+                                                <img src="https://api.dicebear.com/6.x/bottts/svg?seed=Gemini" alt="Gemini AI" />
+                                            </div>
+                                        </div>
+                                        <div className="chat-header">Gemini AI</div>
+                                        <div className="chat-bubble">Thinking...</div>
+                                    </div>
+                                )}
+                                <div ref={messagesEndRef} />
+                            </div>
+                            <form onSubmit={sendMessage} className="flex space-x-4">
+                                <input
+                                    type="text"
+                                    value={newMessage}
+                                    onChange={(e) => setNewMessage(e.target.value)}
+                                    placeholder="Type your message here..."
+                                    className="input input-bordered flex-grow"
+                                />
+                                <button type="submit" className="btn btn-primary">Send</button>
+                            </form>
+                        </main>
+                    )}
+
+                    <footer className="text-center text-sm text-gray-500">
+                        <p>Created by Uzair using React and Firebase</p>
+                        <p>Powered by Gemini AI, Firebase, and DaisyUI</p>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
+
