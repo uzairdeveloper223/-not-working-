@@ -12,7 +12,8 @@ admin.initializeApp({
 const db = admin.firestore();
 
 // Web3 & Contract Setup
-const web3 = new Web3(new Web3.providers.HttpProvider(process.env.ALCHEMY_RPC_URL));
+const { Web3 } = require("web3");  // Ensure you're using Web3 v4+
+const web3 = new Web3(process.env.ALCHEMY_RPC_URL);
 const contractABI = require("./abi.json"); // 🔹 Replace with your contract ABI
 const contractAddress = process.env.CONTRACT_ADDRESS;
 const contract = new web3.eth.Contract(contractABI, contractAddress);
