@@ -1,6 +1,5 @@
 require("dotenv").config();
 const express = require("express");
-const Web3 = require("web3");
 const admin = require("firebase-admin");
 const cors = require("cors");
 
