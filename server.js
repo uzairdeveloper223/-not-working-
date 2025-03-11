@@ -1,96 +1,121 @@
-require("dotenv").config();
 const express = require("express");
-const admin = require("firebase-admin");
 const cors = require("cors");
+const Web3 = require("web3");
+const admin = require("firebase-admin");
+require("dotenv").config();
 
-// Firebase Setup
-const serviceAccount = require("./admin-firebase.json"); // 🔹 Replace with your Firebase Admin SDK JSON
+// Initialize Express
+const app = express();
+
+// Enable CORS for all domains
+app.use(cors({ origin: "*" }));
+app.use(express.json());
+
+// Initialize Firebase Admin SDK
+const serviceAccount = require("./firebase-admin-sdk.json"); // Ensure this file exists
 admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+    credential: admin.credential.cert(serviceAccount)
 });
 const db = admin.firestore();
 
-// Web3 & Contract Setup
-const { Web3 } = require("web3");  // Ensure you're using Web3 v4+
-const web3 = new Web3(process.env.ALCHEMY_RPC_URL);
-const path = require("path");
-const contractABI = require(path.join(__dirname, "abi.json"));
-const contractAddress = process.env.CONTRACT_ADDRESS;
+// Load Web3 with Alchemy RPC URL
+const web3 = new Web3(new Web3.providers.HttpProvider(process.env.ALCHEMY_RPC_URL));
+
+// Load the contract ABI & address
+const contractABI = require("./abi.json");
+const contractAddress = "0x0330Bf3D0deE40a14d9f923c3eD9C1eF445e7862"; // Replace with your contract address
 const contract = new web3.eth.Contract(contractABI, contractAddress);
-const senderAddress = process.env.SENDER_ADDRESS;
-const privateKey = process.env.PRIVATE_KEY;
 
-const app = express();
-app.use(express.json());
-app.use(cors());
+// **GET / (API Status Check)**
+app.get("/", (req, res) => {
+    res.send("UZT Testnet API is running ✅");
+});
 
-// 📌 Handle UZT Transfers
-app.get("/sendUZT", async (req, res) => {
+// **POST /sendUZT (Process Withdrawals)**
+app.post("/sendUZT", async (req, res) => {
     try {
-        const { receiverAdd, amount, useruid } = req.query;
+        const { receiverAdd, amount, useruid } = req.body;
+
         if (!receiverAdd || !amount || !useruid) {
-            return res.status(400).json({ error: "❌ Missing parameters" });
+            return res.status(400).json({ error: "Missing required parameters" });
         }
 
-        // Get user details from Firestore
-        const userDoc = await db.collection("users").doc(useruid).get();
-        if (!userDoc.exists) return res.status(404).json({ error: "❌ User not found" });
+        // Fetch user data from Firestore
+        const userRef = db.collection("users").doc(useruid);
+        const userDoc = await userRef.get();
+
+        if (!userDoc.exists) {
+            return res.status(404).json({ error: "User not found" });
+        }
 
         const userData = userDoc.data();
-        if (!userData.ethAddress || userData.ethAddress !== receiverAdd) {
-            return res.status(400).json({ error: "❌ Ethereum address mismatch" });
+        const userBalance = userData.tokens || 0;
+
+        // Check if user has enough balance
+        if (userBalance < amount) {
+            return res.status(400).json({ error: "Insufficient balance" });
         }
 
-        // Convert amount to Wei
-        const amountWei = web3.utils.toWei(amount.toString(), "ether");
+        // Get the sender's private key (Use environment variable for security)
+        const senderAddress = process.env.SENDER_ADDRESS;
+        const senderPrivateKey = process.env.SENDER_PRIVATE_KEY;
 
-        // Check Sender UZT Balance
-        const senderBalance = await contract.methods.balanceOf(senderAddress).call();
-        if (web3.utils.toBigInt(senderBalance) < web3.utils.toBigInt(amountWei)) {
-            return res.status(400).json({ error: "❌ Insufficient UZT balance" });
+        if (!senderAddress || !senderPrivateKey) {
+            return res.status(500).json({ error: "Server is missing sender credentials" });
         }
 
-        // Estimate Gas
-        const gasLimit = await contract.methods.transfer(receiverAdd, amountWei).estimateGas({ from: senderAddress });
+        // Convert amount to blockchain format (adjust decimal places if needed)
+        const decimals = await contract.methods.decimals().call();
+        const tokenAmount = web3.utils.toBN(amount).mul(web3.utils.toBN(10).pow(web3.utils.toBN(decimals)));
+
+        // Build transaction data
+        const txData = contract.methods.transfer(receiverAdd, tokenAmount).encodeABI();
+
+        // Get gas price
         const gasPrice = await web3.eth.getGasPrice();
-        const gasCost = web3.utils.toBigInt(gasLimit) * web3.utils.toBigInt(gasPrice);
-        const senderETHBalance = await web3.eth.getBalance(senderAddress);
 
-        if (web3.utils.toBigInt(senderETHBalance) < gasCost) {
-            return res.status(400).json({ error: "❌ Insufficient Sepolia ETH for gas fees" });
-        }
-
-        // Sign Transaction
-        const txData = {
+        // Create raw transaction
+        const tx = {
             from: senderAddress,
             to: contractAddress,
-            gas: gasLimit,
+            gas: 200000,
             gasPrice: gasPrice,
-            data: contract.methods.transfer(receiverAdd, amountWei).encodeABI()
+            data: txData
         };
 
-        const signedTx = await web3.eth.accounts.signTransaction(txData, privateKey);
+        // Sign transaction
+        const signedTx = await web3.eth.accounts.signTransaction(tx, senderPrivateKey);
+
+        // Send transaction
         const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
 
-        // Update Firestore Transaction Status
+        console.log("Transaction successful:", receipt.transactionHash);
+
+        // Deduct amount from user's balance and update Firestore
+        await userRef.update({
+            tokens: userBalance - amount
+        });
+
+        // Log the transaction in Firestore
         await db.collection("transactions").add({
             userId: useruid,
             userName: userData.name,
             ethAddress: receiverAdd,
             amount: amount,
-            status: "approved",
+            status: "success",
             txHash: receipt.transactionHash,
             timestamp: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        return res.json({ success: true, txHash: receipt.transactionHash });
-
+        res.json({ success: true, txHash: receipt.transactionHash });
     } catch (error) {
-        console.error("🚨 Error:", error.message || error);
-        return res.status(500).json({ error: "🚨 Transaction failed", details: error.message });
+        console.error("Transaction error:", error);
+        res.status(500).json({ error: "Transaction failed", details: error.message });
     }
 });
 
-// Start Server
+// Start the server on Railway's default port or 3000
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
