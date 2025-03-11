@@ -13,7 +13,8 @@ const db = admin.firestore();
 // Web3 & Contract Setup
 const { Web3 } = require("web3");  // Ensure you're using Web3 v4+
 const web3 = new Web3(process.env.ALCHEMY_RPC_URL);
-const contractABI = require("./abi.json"); // 🔹 Replace with your contract ABI
+const path = require("path");
+const contractABI = require(path.join(__dirname, "abi.json"));
 const contractAddress = process.env.CONTRACT_ADDRESS;
 const contract = new web3.eth.Contract(contractABI, contractAddress);
 const senderAddress = process.env.SENDER_ADDRESS;
