@@ -5,9 +5,8 @@ const admin = require('firebase-admin');
 
 // Initialize Express
 const cors = require('cors');
-app.use(cors());
 const app = express();
-app.use(express.json());
+app.use(cors()); // Enable CORS for all domains
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
