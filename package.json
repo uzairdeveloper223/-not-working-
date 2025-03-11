@@ -1,0 +1,19 @@
+{
+  "name": "uzt-transaction-service",
+  "version": "1.0.0",
+  "description": "Automated UZT token transactions using Alchemy and Firebase on Railway",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^11.10.1",
+    "web3": "^4.5.0",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
