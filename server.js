@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import Web3 from 'web3';
-import admin from 'firebase-admin';
 import cors from 'cors';
+import admin from 'firebase-admin';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -19,19 +19,20 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔥 Firebase Admin Initialization
+
 let serviceAccount;
 if (process.env.FIREBASE_CREDENTIALS) {
-    // Load from environment variable (for Railway)
+    // Decode Base64 stored JSON
     serviceAccount = JSON.parse(Buffer.from(process.env.FIREBASE_CREDENTIALS, 'base64').toString('utf-8'));
 } else {
-    // Load from file (for local development)
+    // Fallback to local file for development
     serviceAccount = require('./serviceAccountKey.json');
 }
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
 });
+
 const db = admin.firestore();
 
 // ✅ Load ABI from abi.json
