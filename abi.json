@@ -1,4 +1,5 @@
-module.export = [
+{
+  "abi": [
   {
     "inputs": [],
     "stateMutability": "nonpayable",
@@ -405,3 +406,4 @@ module.export = [
     "type": "function"
   }
 ]
+}
