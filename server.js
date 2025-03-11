@@ -1,15 +1,20 @@
-require('dotenv').config();
-const express = require('express');
-const Web3 = require('web3');
-const admin = require('firebase-admin');
-const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
+import 'dotenv/config';
+import express from 'express';
+import Web3 from 'web3';
+import admin from 'firebase-admin';
+import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Convert __dirname for ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Initialize Express
 const app = express();
 app.use(cors());
-app.use(express.json()); // Enable JSON parsing
+app.use(express.json());
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -19,10 +24,10 @@ const db = admin.firestore();
 const abiPath = path.join(__dirname, 'abi.json');
 const UZT_ABI = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
 
-// ✅ Initialize Web3 with Alchemy Provider (before using it)
-const web3 = new Web3(process.env.ALCHEMY_URL);
+// ✅ Initialize Web3
+const web3 = new Web3(new Web3.providers.HttpProvider(process.env.ALCHEMY_URL));
 
-// ✅ Load Smart Contract AFTER Web3 is initialized
+// ✅ Load Smart Contract
 const contract = new web3.eth.Contract(UZT_ABI, process.env.CONTRACT_ADDRESS);
 
 // 🔒 Securely Load Environment Variables
