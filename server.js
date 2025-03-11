@@ -2,28 +2,33 @@ require('dotenv').config();
 const express = require('express');
 const Web3 = require('web3');
 const admin = require('firebase-admin');
+const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 
 // Initialize Express
-const cors = require('cors');
 const app = express();
-app.use(cors()); // Enable CORS for all domains
+app.use(cors());
+app.use(express.json()); // Enable JSON parsing
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
 const db = admin.firestore();
-const fs = require('fs');
-const path = require('path');
 
+// Load ABI from abi.json
 const abiPath = path.join(__dirname, 'abi.json');
 const UZT_ABI = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
 
+// ✅ Initialize Web3 with Alchemy Provider (before using it)
+const web3 = new Web3(process.env.ALCHEMY_URL);
+
+// ✅ Load Smart Contract AFTER Web3 is initialized
 const contract = new web3.eth.Contract(UZT_ABI, process.env.CONTRACT_ADDRESS);
 
-// Web3 & Contract Setup
-const web3 = new Web3(process.env.ALCHEMY_URL);
-// Secure Environment Variables
+// 🔒 Securely Load Environment Variables
 const senderAddress = process.env.SENDER_ADDRESS;
 const privateKey = process.env.PRIVATE_KEY;
+
 
 if (!senderAddress || !privateKey || !process.env.ALCHEMY_URL) {
     console.error("❌ Missing environment variables.");
