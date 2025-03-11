@@ -1,42 +1,50 @@
-// Import Modules (ESM Syntax)
 import 'dotenv/config';
 import express from 'express';
 import Web3 from 'web3';
 import admin from 'firebase-admin';
 import cors from 'cors';
-import fs from 'fs/promises'; // Use promises version
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 
-// Define __dirname for ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 
-// Initialize Express
+// Convert __dirname for ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ✅ Initialize Express
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Initialize Firebase Admin SDK
-const serviceAccount = require('./path/to/serviceAccountKey.json'); // Update the correct path
+// 🔥 Firebase Admin Initialization
+let serviceAccount;
+if (process.env.FIREBASE_CREDENTIALS) {
+    // Load from environment variable (for Railway)
+    serviceAccount = JSON.parse(Buffer.from(process.env.FIREBASE_CREDENTIALS, 'base64').toString('utf-8'));
+} else {
+    // Load from file (for local development)
+    serviceAccount = require('./serviceAccountKey.json');
+}
+
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
 });
 const db = admin.firestore();
 
-// Load ABI from abi.json
+// ✅ Load ABI from abi.json
 const abiPath = path.join(__dirname, 'abi.json');
-const UZT_ABI = JSON.parse(await fs.readFile(abiPath, 'utf8'));
+const UZT_ABI = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
 
-// Initialize Web3
+// ✅ Initialize Web3
 const web3 = new Web3(new Web3.providers.HttpProvider(process.env.ALCHEMY_URL));
 
-// Load Smart Contract
+// ✅ Load Smart Contract
 const contract = new web3.eth.Contract(UZT_ABI, process.env.CONTRACT_ADDRESS);
 
-// Securely Load Environment Variables
+// 🔒 Securely Load Environment Variables
 const senderAddress = process.env.SENDER_ADDRESS;
 const privateKey = process.env.PRIVATE_KEY;
 
@@ -83,14 +91,14 @@ app.get('/sendUZT', async (req, res) => {
         const senderUZTBalance = await contract.methods.balanceOf(senderAddress).call();
         console.log(`💰 Sender's UZT Balance: ${senderUZTBalance} UZT`);
 
-        if (BigInt(senderUZTBalance) < BigInt(amountWei)) {
+        if (web3.utils.toBigInt(senderUZTBalance) < web3.utils.toBigInt(amountWei)) {
             throw new Error("❌ Insufficient UZT balance in sender's wallet.");
         }
 
         // Check ETH Balance for Gas Fees
         const gasLimit = await contract.methods.transfer(receiverAdd, amountWei).estimateGas({ from: senderAddress });
         const gasPrice = await web3.eth.getGasPrice();
-        const gasCost = BigInt(gasLimit) * BigInt(gasPrice);
+        const gasCost = web3.utils.toBigInt(gasLimit) * web3.utils.toBigInt(gasPrice);
         const senderETHBalance = await web3.eth.getBalance(senderAddress);
 
         console.log(`⛽ Gas Limit: ${gasLimit}`);
@@ -98,7 +106,7 @@ app.get('/sendUZT', async (req, res) => {
         console.log(`⛽ Estimated Gas Cost: ${web3.utils.fromWei(gasCost.toString(), "ether")} ETH`);
         console.log(`💰 Sender's Sepolia ETH Balance: ${web3.utils.fromWei(senderETHBalance, "ether")} ETH`);
 
-        if (BigInt(senderETHBalance) < gasCost) {
+        if (web3.utils.toBigInt(senderETHBalance) < gasCost) {
             throw new Error("❌ Insufficient Sepolia ETH balance for gas fees.");
         }
 
@@ -108,7 +116,7 @@ app.get('/sendUZT', async (req, res) => {
             to: process.env.CONTRACT_ADDRESS,
             gas: gasLimit,
             gasPrice: gasPrice,
-            data: contract.methods.transfer(receiverAdd, amountWei).encodeABI(),
+            data: contract.methods.transfer(receiverAdd, amountWei).encodeABI()
         };
 
         // Sign and Send Transaction
@@ -121,7 +129,7 @@ app.get('/sendUZT', async (req, res) => {
         // Update Firestore (Subtract Tokens from User's Balance)
         await userRef.update({
             tokens: admin.firestore.FieldValue.increment(-amount),
-            lastTransaction: receipt.transactionHash,
+            lastTransaction: receipt.transactionHash
         });
 
         res.json({ success: true, txHash: receipt.transactionHash });
