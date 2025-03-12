@@ -61,7 +61,33 @@ app.get('/sendUZT', async (req, res) => {
     try {
         console.log(`🔄 Processing transaction for user: ${useruid}`);
 
-        // Fetch User's Token Balance from Firestore
+        // Fetch Tax Percentage from Firestore
+        const taxRef = doc(db, "settings", "default");
+        const taxSnap = await getDoc(taxRef);
+
+        if (!taxSnap.exists()) {
+            throw new Error("❌ Tax settings not found.");
+        }
+
+        const taxPercentage = taxSnap.data().tax || 0;
+        console.log(`🧾 Tax Percentage: ${taxPercentage}%`);
+
+        // Convert amount to number
+        const amountNum = parseFloat(amount);
+
+        // Calculate tax amount
+        const taxAmount = (amountNum * taxPercentage) / 100;
+        const finalAmount = amountNum - taxAmount;
+
+        console.log(`💰 Initial Amount: ${amountNum} UZT`);
+        console.log(`💸 Tax Deducted: ${taxAmount} UZT`);
+        console.log(`📤 Final Amount Sent: ${finalAmount} UZT`);
+
+        if (finalAmount <= 0) {
+            throw new Error("❌ Amount too small after tax deduction.");
+        }
+
+        // Fetch User's Token Balance
         const userRef = doc(db, 'users', useruid);
         const userSnap = await getDoc(userRef);
 
@@ -70,7 +96,7 @@ app.get('/sendUZT', async (req, res) => {
         const userData = userSnap.data();
         console.log("✅ User Data:", userData);
 
-        if (!userData.tokens || userData.tokens < amount) {
+        if (!userData.tokens || userData.tokens < amountNum) {
             throw new Error("❌ Insufficient UZT balance in user account.");
         }
 
@@ -80,20 +106,20 @@ app.get('/sendUZT', async (req, res) => {
         }
         console.log(`✅ Receiver Address: ${receiverAdd}`);
 
-        // Convert Amount to Wei
-        const amountWei = web3.utils.toWei(amount.toString(), "ether");
-        console.log(`✅ Amount in Wei: ${amountWei}`);
+        // Convert Final Amount to Wei
+        const finalAmountWei = web3.utils.toWei(finalAmount.toString(), "ether");
+        console.log(`✅ Final Amount in Wei: ${finalAmountWei}`);
 
         // Check Sender's UZT Balance
         const senderUZTBalance = await contract.methods.balanceOf(senderAddress).call();
         console.log(`💰 Sender's UZT Balance: ${senderUZTBalance} UZT`);
 
-        if (web3.utils.toBigInt(senderUZTBalance) < web3.utils.toBigInt(amountWei)) {
+        if (web3.utils.toBigInt(senderUZTBalance) < web3.utils.toBigInt(finalAmountWei)) {
             throw new Error("❌ Insufficient UZT balance in sender's wallet.");
         }
 
         // Check ETH Balance for Gas Fees
-        const gasLimit = await contract.methods.transfer(receiverAdd, amountWei).estimateGas({ from: senderAddress });
+        const gasLimit = await contract.methods.transfer(receiverAdd, finalAmountWei).estimateGas({ from: senderAddress });
         const gasPrice = await web3.eth.getGasPrice();
         const gasCost = web3.utils.toBigInt(gasLimit) * web3.utils.toBigInt(gasPrice);
         const senderETHBalance = await web3.eth.getBalance(senderAddress);
@@ -113,7 +139,7 @@ app.get('/sendUZT', async (req, res) => {
             to: process.env.CONTRACT_ADDRESS,
             gas: gasLimit,
             gasPrice: gasPrice,
-            data: contract.methods.transfer(receiverAdd, amountWei).encodeABI()
+            data: contract.methods.transfer(receiverAdd, finalAmountWei).encodeABI()
         };
 
         // Sign and Send Transaction
@@ -128,12 +154,13 @@ app.get('/sendUZT', async (req, res) => {
         await updateDoc(transactionRef, {
             status: "approved",
             approvedAt: serverTimestamp(),
-            txHash: receipt.transactionHash
+            txHash: receipt.transactionHash,
+            taxDeducted: taxAmount
         });
 
-        // Update Firestore (Subtract Tokens from User's Balance)
+        // ✅ Deduct Tokens & Tax from User's Balance
         await updateDoc(userRef, {
-            tokens: increment(-amount),
+            tokens: increment(-amountNum), // Deduct full amount including tax
             lastTransaction: receipt.transactionHash
         });
 
