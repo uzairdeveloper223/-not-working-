@@ -2,33 +2,35 @@ import 'dotenv/config';
 import express from 'express';
 import Web3 from 'web3';
 import cors from 'cors';
-import admin from 'firebase-admin';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, getDoc, updateDoc, increment } from "firebase/firestore";
 
 // Convert __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const require = createRequire(import.meta.url);
 
 // ✅ Initialize Express
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ✅ Firebase Web SDK Configuration
 
-const serviceAccount = JSON.parse(
-  Buffer.from(process.env.FIREBASE_CREDENTIALS, "base64").toString("utf-8")
-);
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
-
-const db = admin.firestore();
+const firebaseConfig = {
+  apiKey: "AIzaSyBg1E1MDhmBWkZzGLN9TfWO02HPZ97rXJo",
+  authDomain: "todo-master-dev-uzair.firebaseapp.com",
+  projectId: "todo-master-dev-uzair",
+  storageBucket: "todo-master-dev-uzair.firebasestorage.app",
+  messagingSenderId: "333109267415",
+  appId: "1:333109267415:web:60e5411bb485209f55d992"
+};
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
 
 // ✅ Load ABI from abi.json
 const abiPath = path.join(__dirname, 'abi.json');
@@ -60,13 +62,13 @@ app.get('/sendUZT', async (req, res) => {
     try {
         console.log(`🔄 Processing transaction for user: ${useruid}`);
 
-        // Fetch User's Token Balance from Firebase
-        const userRef = db.collection('users').doc(useruid);
-        const userDoc = await userRef.get();
+        // Fetch User's Token Balance from Firestore
+        const userRef = doc(db, 'users', useruid);
+        const userSnap = await getDoc(userRef);
 
-        if (!userDoc.exists) throw new Error("❌ User not found in database.");
+        if (!userSnap.exists()) throw new Error("❌ User not found in database.");
 
-        const userData = userDoc.data();
+        const userData = userSnap.data();
         console.log("✅ User Data:", userData);
 
         if (!userData.tokens || userData.tokens < amount) {
@@ -123,8 +125,8 @@ app.get('/sendUZT', async (req, res) => {
         console.log(`✅ UZT Sent Successfully! Tx Hash: ${receipt.transactionHash}`);
 
         // Update Firestore (Subtract Tokens from User's Balance)
-        await userRef.update({
-            tokens: admin.firestore.FieldValue.increment(-amount),
+        await updateDoc(userRef, {
+            tokens: increment(-amount),
             lastTransaction: receipt.transactionHash
         });
 
