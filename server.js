@@ -7,7 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, updateDoc, increment } from "firebase/firestore";
+import { getFirestore, doc, getDoc, updateDoc, increment, serverTimestamp } from "firebase/firestore";
 
 // Convert __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -20,14 +20,13 @@ app.use(cors());
 app.use(express.json());
 
 // ✅ Firebase Web SDK Configuration
-
 const firebaseConfig = {
-  apiKey: "AIzaSyBg1E1MDhmBWkZzGLN9TfWO02HPZ97rXJo",
-  authDomain: "todo-master-dev-uzair.firebaseapp.com",
-  projectId: "todo-master-dev-uzair",
-  storageBucket: "todo-master-dev-uzair.firebasestorage.app",
-  messagingSenderId: "333109267415",
-  appId: "1:333109267415:web:60e5411bb485209f55d992"
+    apiKey: "AIzaSyBg1E1MDhmBWkZzGLN9TfWO02HPZ97rXJo",
+    authDomain: "todo-master-dev-uzair.firebaseapp.com",
+    projectId: "todo-master-dev-uzair",
+    storageBucket: "todo-master-dev-uzair.firebasestorage.app",
+    messagingSenderId: "333109267415",
+    appId: "1:333109267415:web:60e5411bb485209f55d992"
 };
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
@@ -53,9 +52,9 @@ if (!senderAddress || !privateKey || !process.env.ALCHEMY_URL) {
 
 // ✅ Send UZT Transaction API
 app.get('/sendUZT', async (req, res) => {
-    const { receiverAdd, amount, useruid } = req.query;
+    const { receiverAdd, amount, useruid, transactionID } = req.query;
 
-    if (!receiverAdd || !amount || !useruid) {
+    if (!receiverAdd || !amount || !useruid || !transactionID) {
         return res.status(400).json({ error: "❌ Missing required parameters." });
     }
 
@@ -123,6 +122,14 @@ app.get('/sendUZT', async (req, res) => {
         const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
 
         console.log(`✅ UZT Sent Successfully! Tx Hash: ${receipt.transactionHash}`);
+
+        // ✅ Update Firestore Transactions Collection
+        const transactionRef = doc(db, "transactions", transactionID);
+        await updateDoc(transactionRef, {
+            status: "approved",
+            approvedAt: serverTimestamp(),
+            txHash: receipt.transactionHash
+        });
 
         // Update Firestore (Subtract Tokens from User's Balance)
         await updateDoc(userRef, {
