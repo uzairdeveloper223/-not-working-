@@ -20,17 +20,12 @@ app.use(cors());
 app.use(express.json());
 
 
-let serviceAccount;
-if (process.env.FIREBASE_CREDENTIALS) {
-    // Decode Base64 stored JSON
-    serviceAccount = JSON.parse(Buffer.from(process.env.FIREBASE_CREDENTIALS, 'base64').toString('utf-8'));
-} else {
-    // Fallback to local file for development
-    serviceAccount = require('./serviceAccountKey.json');
-}
+const serviceAccount = JSON.parse(
+  Buffer.from(process.env.FIREBASE_CREDENTIALS, "base64").toString("utf-8")
+);
 
 admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+  credential: admin.credential.cert(serviceAccount),
 });
 
 const db = admin.firestore();
