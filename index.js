@@ -21,288 +21,103 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 
-// ✅ UZT ABI (embed directly since we can't read files in serverless)
+// ✅ Complete ERC-20 Token ABI (Standard UZT Token ABI)
 const UZT_ABI = [
-   [
-  {
-    "inputs": [],
-    "stateMutability": "nonpayable",
-    "type": "constructor"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "owner",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "spender",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "value",
-        "type": "uint256"
-      }
-    ],
-    "name": "Approval",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "from",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "to",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "value",
-        "type": "uint256"
-      }
-    ],
-    "name": "Transfer",
-    "type": "event"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "tokenOwner",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "spender",
-        "type": "address"
-      }
-    ],
-    "name": "allowance",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "spender",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "approve",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
-      }
-    ],
-    "name": "balanceOf",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "burn",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "decimals",
-    "outputs": [
-      {
-        "internalType": "uint8",
-        "name": "",
-        "type": "uint8"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "to",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "mint",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "name",
-    "outputs": [
-      {
-        "internalType": "string",
-        "name": "",
-        "type": "string"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "owner",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "symbol",
-    "outputs": [
-      {
-        "internalType": "string",
-        "name": "",
-        "type": "string"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "totalSupply",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "recipient",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "transfer",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "sender",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "recipient",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "transferFrom",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
-]
+    {
+        "inputs": [
+            {"internalType": "address", "name": "to", "type": "address"},
+            {"internalType": "uint256", "name": "amount", "type": "uint256"}
+        ],
+        "name": "transfer",
+        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [{"internalType": "address", "name": "account", "type": "address"}],
+        "name": "balanceOf",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "totalSupply",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "name",
+        "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "symbol",
+        "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "decimals",
+        "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {"internalType": "address", "name": "owner", "type": "address"},
+            {"internalType": "address", "name": "spender", "type": "address"}
+        ],
+        "name": "allowance",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {"internalType": "address", "name": "spender", "type": "address"},
+            {"internalType": "uint256", "name": "amount", "type": "uint256"}
+        ],
+        "name": "approve",
+        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {"internalType": "address", "name": "from", "type": "address"},
+            {"internalType": "address", "name": "to", "type": "address"},
+            {"internalType": "uint256", "name": "amount", "type": "uint256"}
+        ],
+        "name": "transferFrom",
+        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    }
 ];
 
-// ✅ Initialize Web3
-const web3 = new Web3(new Web3.providers.HttpProvider(process.env.ALCHEMY_URL));
+// ✅ Initialize Web3 and Contract with Error Handling
+let web3, contract;
 
-// ✅ Load Smart Contract
-const contract = new web3.eth.Contract(UZT_ABI, process.env.CONTRACT_ADDRESS);
+try {
+    if (!process.env.ALCHEMY_URL || !process.env.CONTRACT_ADDRESS) {
+        throw new Error("Missing ALCHEMY_URL or CONTRACT_ADDRESS environment variables");
+    }
+    
+    web3 = new Web3(new Web3.providers.HttpProvider(process.env.ALCHEMY_URL));
+    contract = new web3.eth.Contract(UZT_ABI, process.env.CONTRACT_ADDRESS);
+    
+    console.log("✅ Web3 and Contract initialized successfully");
+    console.log("📋 Contract Address:", process.env.CONTRACT_ADDRESS);
+    console.log("🔗 Available Methods:", Object.keys(contract.methods));
+} catch (error) {
+    console.error("❌ Error initializing Web3/Contract:", error.message);
+}
 
 // 🔒 Environment Variables
 const senderAddress = process.env.SENDER_ADDRESS;
@@ -312,12 +127,21 @@ const privateKey = process.env.PRIVATE_KEY;
 app.get('/sendUZT', async (req, res) => {
     const { receiverAdd, amount, useruid, transactionID } = req.query;
 
+    // Check if Web3 and contract are properly initialized
+    if (!web3 || !contract) {
+        return res.status(500).json({ 
+            success: false, 
+            error: "❌ Web3 or Contract not properly initialized" 
+        });
+    }
+
     if (!receiverAdd || !amount || !useruid || !transactionID) {
         return res.status(400).json({ error: "❌ Missing required parameters." });
     }
 
     try {
         console.log(`🔄 Processing transaction for user: ${useruid}`);
+        console.log("🔍 Available contract methods:", Object.keys(contract.methods));
 
         // Fetch Tax Percentage from Firestore
         const taxRef = doc(db, "settings", "default");
@@ -432,6 +256,33 @@ app.get('/sendUZT', async (req, res) => {
 // ✅ Health check endpoint
 app.get('/', (req, res) => {
     res.json({ message: "UZT Server is running!" });
+});
+
+// 🔍 Debug endpoint to check contract initialization
+app.get('/debug', async (req, res) => {
+    try {
+        const response = {
+            web3Initialized: !!web3,
+            contractInitialized: !!contract,
+            contractAddress: process.env.CONTRACT_ADDRESS,
+            alchemyUrl: process.env.ALCHEMY_URL ? "✅ Set" : "❌ Not set",
+            availableMethods: contract ? Object.keys(contract.methods) : "Contract not initialized"
+        };
+
+        // Test contract method if available
+        if (contract && contract.methods.balanceOf) {
+            try {
+                const testBalance = await contract.methods.balanceOf(process.env.SENDER_ADDRESS).call();
+                response.testBalanceCall = `✅ Success: ${testBalance}`;
+            } catch (error) {
+                response.testBalanceCall = `❌ Error: ${error.message}`;
+            }
+        }
+
+        res.json(response);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // ✅ Export for Vercel
