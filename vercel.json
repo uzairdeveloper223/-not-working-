@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "index.js"
+    }
+  ],
+  "env": {
+    "ALCHEMY_URL": "https://eth-sepolia.g.alchemy.com/v2/P0o_EWu0dEZh3ZNi3pJdGPoW3ydLHshm",
+    "CONTRACT_ADDRESS": "0xD34A92111268942311EB8cA207a9091f12d2Ef3A",
+    "SENDER_ADDRESS": "0x6108956cef9e76141502b014371d15aa82a9fde2",
+    "PRIVATE_KEY": "0xded2c6798e0f10f2746b104321ba046655ff25531d6b83d724cdfec584636ae9"
+  }
+}
